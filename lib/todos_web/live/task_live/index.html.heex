@@ -1,0 +1,88 @@
+<%!-- <.header>
+  Listing Tasks
+  <:actions>
+    <.link patch={~p"/tasks/new"}>
+      <.button>New Task</.button>
+    </.link>
+  </:actions>
+</.header> --%>
+<div class="font-josefin items-center relative" id="theme-root">
+  <div class="absolute top-0 h-screen w-screen bg-zinc-50 dark:bg-zinc-950 -z-10">
+    <div class="w-screen h-[300px] top-0 absolute bg-no-repeat bg-cover bg-[url(/images/bg.jpg)] dark:bg-[url(/images/bg-dark.jpg)]" />
+  </div>
+  <section class="flex justify-center pt-16">
+    <div class="w-[530px] flex gap-6 flex-col pt-1.5">
+      <div class="flex w-full justify-between">
+        <h1 class="text-white font-bold text-4xl tracking-[15px]">TODO</h1>
+        <.dark_mode_toggle />
+      </div>
+
+      <.new_task_form form={@form} />
+
+      <div class="w-full bg-white dark:bg-[#25273D] drop-shadow-2xl rounded-md z-20">
+        <ul id="todo-list" phx-update="stream">
+          <%!-- <.live_component module={TodosWeb.TaskLive.TaskListComponent} id="tasks" /> --%>
+          <.todo_item :for={{task_id, task} <- @streams.tasks} task={task} id={task_id} />
+        </ul>
+        <footer class="flex py-4 px-6 text-[#9495A5] dark:text-[#5B5E7E] text-sm justify-between">
+          <span><%= "#{@count} items left" %></span>
+          <form phx-change="filter" class="flex gap-4 font-bold">
+            <%= for filter <- ["All", "Active", "Completed"] do %>
+              <input
+                type="radio"
+                name="filter"
+                value={filter}
+                id={filter}
+                checked={@filter == filter}
+                class="hidden"
+              />
+              <label
+                for={filter}
+                class={["cursor-pointer", @filter == filter && "text-[#3A7CFD]"]}
+              >
+                <%= filter %>
+              </label>
+            <% end %>
+          </form>
+          <button phx-click="clear_completed">Clear Completed</button>
+        </footer>
+      </div>
+    </div>
+  </section>
+</div>
+
+<%!-- <.button :if={@dark_mode} phx-click="light_mode">LIGHT</.button> --%>
+
+<%!-- <.table
+  id="tasks"
+  rows={@streams.tasks}
+  row_click={fn {_id, task} -> JS.navigate(~p"/tasks/#{task}") end}
+>
+  <:col :let={{_id, task}} label="Title"><%= task.title %></:col>
+  <:col :let={{_id, task}} label="Done"><%= task.done %></:col>
+  <:action :let={{_id, task}}>
+    <div class="sr-only">
+      <.link navigate={~p"/tasks/#{task}"}>Show</.link>
+    </div>
+    <.link patch={~p"/tasks/#{task}/edit"}>Edit</.link>
+  </:action>
+  <:action :let={{id, task}}>
+    <.link
+      phx-click={JS.push("delete", value: %{id: task.id}) |> hide("##{id}")}
+      data-confirm="Are you sure?"
+    >
+      Delete
+    </.link>
+  </:action>
+</.table>
+
+<.modal :if={@live_action in [:new, :edit]} id="task-modal" show on_cancel={JS.patch(~p"/tasks")}>
+  <.live_component
+    module={TodosWeb.TaskLive.FormComponent}
+    id={@task.id || :new}
+    title={@page_title}
+    action={@live_action}
+    task={@task}
+    patch={~p"/tasks"}
+  />
+</.modal> --%>
