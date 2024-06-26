@@ -3,6 +3,7 @@ defmodule Todos.Tasks do
   The Tasks context.
   """
 
+  @topic inspect(__MODULE__)
   import Ecto.Query, warn: false
   alias Todos.Repo
 
@@ -21,13 +22,27 @@ defmodule Todos.Tasks do
     Repo.all(from t in Task, order_by: [desc: t.id])
   end
 
-  def subscribe do
-    Phoenix.PubSub.subscribe(Todos.PubSub, "tasks")
+  def list_tasks(filter) when is_map(filter) do
+    from(t in Task, order_by: [desc: t.id])
+    |> filter_by_status(filter)
+    |> Repo.all()
   end
 
-  def broadcast({:ok, task}, tag) do
-    Phoenix.PubSub.broadcast(Todos.PubSub, "tasks", {tag, task})
-    {:ok, task}
+  def count_tasks() do
+    from(Task) |> where(done: false) |> Repo.aggregate(:count)
+  end
+
+  def filter_by_status(query, %{done: done}) do
+    where(query, done: ^done)
+  end
+
+  def subscribe do
+    Phoenix.PubSub.subscribe(Todos.PubSub, @topic)
+  end
+
+  def broadcast({:ok, msg}, tag) do
+    Phoenix.PubSub.broadcast(Todos.PubSub, @topic, {tag, msg})
+    {:ok, msg}
   end
 
   def broadcast({:error, _changeset} = error, _tag), do: error
@@ -61,10 +76,14 @@ defmodule Todos.Tasks do
 
   """
   def create_task(attrs \\ %{}) do
-    %Task{}
-    |> Task.changeset(attrs)
-    |> Repo.insert()
-    |> broadcast(:task_created)
+    if from(Task) |> Repo.aggregate(:count) >= 100 do
+      {:error, "Cannot create more than 100 tasks"}
+    else
+      %Task{}
+      |> Task.changeset(attrs)
+      |> Repo.insert()
+      |> broadcast(:task_created)
+    end
   end
 
   @doc """
@@ -100,6 +119,11 @@ defmodule Todos.Tasks do
   """
   def delete_task(%Task{} = task) do
     Repo.delete(task) |> broadcast(:task_deleted)
+  end
+
+  def delete_done_tasks() do
+    {count, _} = from(t in Task, where: t.done == true) |> Repo.delete_all()
+    if count > 0, do: broadcast({:ok, count}, :done_tasks_deleted)
   end
 
   @doc """

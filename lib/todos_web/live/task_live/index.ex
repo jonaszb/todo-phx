@@ -1,9 +1,10 @@
 defmodule TodosWeb.TaskLive.Index do
-  @known_filters ["Active", "All", "Completed"]
+  @known_filters ["All", "Active", "Completed"]
   use TodosWeb, :live_view
 
   alias Todos.Tasks
   alias Todos.Tasks.Task
+  alias TodosWeb.TaskLive.IndexTracker
 
   @impl true
   def mount(_params, _session, socket) do
@@ -11,17 +12,29 @@ defmodule TodosWeb.TaskLive.Index do
       Tasks.subscribe()
     end
 
-    tasks = Tasks.list_tasks()
     {:ok, default_filter} = Enum.fetch(@known_filters, 0)
+    tasks = list_tasks_with_filter(default_filter)
+    count = Tasks.count_tasks()
+    id_map = IndexTracker.create_id_list(tasks)
 
     {:ok,
      socket
      |> stream(:tasks, tasks)
      |> assign(
+       id_map: id_map,
        form: Tasks.change_task(%Task{}) |> to_form,
        filter: default_filter,
-       count: length(Enum.filter(tasks, fn %{done: done} -> done == false end))
+       count: count,
+       clearing: false
      )}
+  end
+
+  def list_tasks_with_filter(filter) do
+    case filter do
+      "All" -> Tasks.list_tasks()
+      "Active" -> Tasks.list_tasks(%{done: false})
+      "Completed" -> Tasks.list_tasks(%{done: true})
+    end
   end
 
   def dark_mode_toggle(assigns) do
@@ -35,7 +48,15 @@ defmodule TodosWeb.TaskLive.Index do
 
   def handle_info({:task_created, task}, socket) do
     socket = update(socket, :count, &(&1 + 1))
-    {:noreply, stream_insert(socket, :tasks, task, at: 0)}
+
+    socket =
+      if should_render?(socket, task) do
+        insert_task(socket, task)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info({:task_updated, task}, socket) do
@@ -45,7 +66,14 @@ defmodule TodosWeb.TaskLive.Index do
         false -> update(socket, :count, &(&1 + 1))
       end
 
-    {:noreply, stream_insert(socket, :tasks, task)}
+    socket =
+      if should_render?(socket, task) do
+        insert_task(socket, task)
+      else
+        delete_task(socket, task)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info({:task_deleted, task}, socket) do
@@ -55,13 +83,26 @@ defmodule TodosWeb.TaskLive.Index do
         false -> update(socket, :count, &(&1 - 1))
       end
 
-    {:noreply, stream_delete(socket, :tasks, task)}
+    {:noreply,
+     assign(socket,
+       id_map:
+         case should_render?(socket, task) do
+           true -> IndexTracker.remove_task(socket.assigns.id_map, task.id)
+           false -> socket.assigns.id_map
+         end
+     )
+     |> stream_delete(:tasks, task)}
   end
 
-  # @impl true
-  # def handle_info({TodosWeb.TaskLive.FormComponent, {:saved, task}}, socket) do
-  #   {:noreply, stream_insert(socket, :tasks, task)}
-  # end
+  def handle_info({:done_tasks_deleted, count}, socket) do
+    socket = put_flash(socket, :info, "Cleared #{count} completed task#{if count > 1, do: "s"}")
+    tasks = list_tasks_with_filter(socket.assigns.filter)
+
+    {:noreply,
+     socket
+     |> stream(:tasks, tasks, reset: true)
+     |> assign(id_map: IndexTracker.create_id_list(tasks), clearing: false)}
+  end
 
   @impl true
   def handle_event("validate", task_params, socket) do
@@ -70,14 +111,12 @@ defmodule TodosWeb.TaskLive.Index do
   end
 
   def handle_event("filter", %{"filter" => filter}, socket) do
-    socket =
-      if(filter in @known_filters) do
-        assign(socket, :filter, filter)
-      else
-        socket
-      end
+    socket = if filter in @known_filters, do: assign(socket, :filter, filter), else: socket
+    tasks = list_tasks_with_filter(socket.assigns.filter)
 
-    {:noreply, stream}
+    {:noreply,
+     assign(socket, id_map: IndexTracker.create_id_list(tasks))
+     |> stream(:tasks, tasks, reset: true)}
   end
 
   # @impl true
@@ -88,11 +127,23 @@ defmodule TodosWeb.TaskLive.Index do
   end
 
   def handle_event("create_task", params, socket) do
-    {:ok, _new_task} = Tasks.create_task(params)
+    socket =
+      case Tasks.create_task(params) do
+        {:ok, _new_task} -> assign(socket, form: Tasks.change_task(%Task{}) |> to_form)
+        {:error, error_msg} -> put_flash(socket, :error, error_msg)
+      end
 
-    {:noreply,
-     socket
-     |> assign(form: Tasks.change_task(%Task{}) |> to_form)}
+    {:noreply, socket}
+  end
+
+  def handle_event("clear_completed", _, socket) do
+    socket =
+      case Tasks.delete_done_tasks() do
+        {:ok, _} -> assign(socket, clearing: true)
+        _ -> socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_event("toggle_status", %{"id" => id} = params, socket) do
@@ -108,11 +159,29 @@ defmodule TodosWeb.TaskLive.Index do
     {:noreply, socket}
   end
 
-  defp should_render(task, filter) do
-    case filter do
-      "All" -> true
-      "Active" -> task.done == false
-      "Completed" -> task.done == true
+  defp insert_task(socket, task) do
+    {id_map, new_index} = IndexTracker.insert_task(socket.assigns.id_map, task.id)
+    assign(socket, id_map: id_map) |> stream_insert(:tasks, task, at: new_index)
+  end
+
+  defp delete_task(socket, task) do
+    assign(socket,
+      id_map:
+        if should_render?(socket, task) do
+          socket.assigns.id_map
+        else
+          IndexTracker.remove_task(socket.assigns.id_map, task.id)
+        end
+    )
+    |> stream_delete(:tasks, task)
+  end
+
+  defp should_render?(socket, task) do
+    case {socket.assigns.filter, task.done} do
+      {"All", _} -> true
+      {"Active", false} -> true
+      {"Completed", true} -> true
+      _ -> false
     end
   end
 

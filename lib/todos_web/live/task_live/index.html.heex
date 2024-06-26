@@ -20,31 +20,41 @@
       <.new_task_form form={@form} />
 
       <div class="w-full bg-white dark:bg-[#25273D] drop-shadow-2xl rounded-md z-20">
-        <ul id="todo-list" phx-update="stream">
-          <%!-- <.live_component module={TodosWeb.TaskLive.TaskListComponent} id="tasks" /> --%>
+        <ul class="h-[345px] overflow-scroll" id="todo-list" phx-update="stream">
           <.todo_item :for={{task_id, task} <- @streams.tasks} task={task} id={task_id} />
         </ul>
         <footer class="flex py-4 px-6 text-[#9495A5] dark:text-[#5B5E7E] text-sm justify-between">
           <span><%= "#{@count} items left" %></span>
           <form phx-change="filter" class="flex gap-4 font-bold">
             <%= for filter <- ["All", "Active", "Completed"] do %>
-              <input
-                type="radio"
-                name="filter"
-                value={filter}
-                id={filter}
-                checked={@filter == filter}
-                class="hidden"
-              />
-              <label
-                for={filter}
-                class={["cursor-pointer", @filter == filter && "text-[#3A7CFD]"]}
-              >
-                <%= filter %>
-              </label>
+              <span>
+                <input
+                  type="radio"
+                  name="filter"
+                  value={filter}
+                  id={filter}
+                  checked={@filter == filter}
+                  class="hidden peer"
+                />
+                <label
+                  for={filter}
+                  class={[
+                    "cursor-pointer transition-all peer-checked:text-[#3A7CFD]",
+                    @filter != filter && "hover:text-[#494C6B] dark:hover:text-[#E3E4F1]"
+                  ]}
+                >
+                  <%= filter %>
+                </label>
+              </span>
             <% end %>
           </form>
-          <button phx-click="clear_completed">Clear Completed</button>
+          <button
+            disabled={@clearing}
+            phx-click="clear_completed"
+            class="hover:text-[#494C6B] dark:hover:text-[#E3E4F1] transition-all"
+          >
+            Clear Completed
+          </button>
         </footer>
       </div>
     </div>
