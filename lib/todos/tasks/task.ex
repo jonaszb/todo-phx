@@ -13,6 +13,7 @@ defmodule Todos.Tasks.Task do
   def changeset(task, attrs) do
     task
     |> cast(attrs, [:title, :done])
-    |> validate_required([:title, :done])
+    |> validate_required([:title, :done], message: "Title cannot be empty")
+    |> validate_length(:title, max: 80, message: "Title cannot exceed 80 characters")
   end
 end

@@ -11,43 +11,21 @@
     <div class="w-screen h-[300px] top-0 absolute bg-no-repeat bg-cover bg-[url(/images/bg.jpg)] dark:bg-[url(/images/bg-dark.jpg)]" />
   </div>
   <section class="flex justify-center pt-16">
-    <div class="w-[530px] flex gap-6 flex-col pt-1.5">
+    <div class="w-80 sm:w-[530px] flex gap-6 flex-col pt-1.5">
       <div class="flex w-full justify-between">
-        <h1 class="text-white font-bold text-4xl tracking-[15px]">TODO</h1>
+        <h1 class="text-white font-bold text-3xl sm:text-4xl tracking-[15px]">TODO</h1>
         <.dark_mode_toggle />
       </div>
 
       <.new_task_form form={@form} />
 
       <div class="w-full bg-white dark:bg-[#25273D] drop-shadow-2xl rounded-md z-20">
-        <ul class="h-[345px] overflow-scroll" id="todo-list" phx-update="stream">
+        <ul class="h-[265px] sm:h-[345px] overflow-scroll" id="todo-list" phx-update="stream">
           <.todo_item :for={{task_id, task} <- @streams.tasks} task={task} id={task_id} />
         </ul>
         <footer class="flex py-4 px-6 text-[#9495A5] dark:text-[#5B5E7E] text-sm justify-between">
           <span><%= "#{@count} items left" %></span>
-          <form phx-change="filter" class="flex gap-4 font-bold">
-            <%= for filter <- ["All", "Active", "Completed"] do %>
-              <span>
-                <input
-                  type="radio"
-                  name="filter"
-                  value={filter}
-                  id={filter}
-                  checked={@filter == filter}
-                  class="hidden peer"
-                />
-                <label
-                  for={filter}
-                  class={[
-                    "cursor-pointer transition-all peer-checked:text-[#3A7CFD]",
-                    @filter != filter && "hover:text-[#494C6B] dark:hover:text-[#E3E4F1]"
-                  ]}
-                >
-                  <%= filter %>
-                </label>
-              </span>
-            <% end %>
-          </form>
+          <.filters filter={@filter} class="hidden sm:flex" />
           <button
             disabled={@clearing}
             phx-click="clear_completed"
@@ -57,6 +35,11 @@
           </button>
         </footer>
       </div>
+
+      <.filters
+        filter={@filter}
+        class="sm:hidden w-full py-4 justify-center bg-white dark:bg-[#25273D] drop-shadow-2xl rounded-md z-20 text-[#9495A5] dark:text-[#5B5E7E] text-sm "
+      />
     </div>
   </section>
 </div>

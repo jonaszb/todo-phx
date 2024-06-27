@@ -76,13 +76,15 @@ defmodule Todos.Tasks do
 
   """
   def create_task(attrs \\ %{}) do
-    if from(Task) |> Repo.aggregate(:count) >= 100 do
-      {:error, "Cannot create more than 100 tasks"}
-    else
-      %Task{}
-      |> Task.changeset(attrs)
-      |> Repo.insert()
-      |> broadcast(:task_created)
+    cond do
+      from(Task) |> Repo.aggregate(:count) >= 100 ->
+        {:error, "Cannot create more than 100 tasks"}
+
+      true ->
+        %Task{}
+        |> Task.changeset(attrs)
+        |> Repo.insert()
+        |> broadcast(:task_created)
     end
   end
 

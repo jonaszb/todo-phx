@@ -16,13 +16,14 @@ defmodule TodosWeb.TaskLive.Index do
     tasks = list_tasks_with_filter(default_filter)
     count = Tasks.count_tasks()
     id_map = IndexTracker.create_id_list(tasks)
+    changeset = %Task{} |> Tasks.change_task() |> Map.put(:action, :validate)
 
     {:ok,
      socket
      |> stream(:tasks, tasks)
      |> assign(
        id_map: id_map,
-       form: Tasks.change_task(%Task{}) |> to_form,
+       form: to_form(changeset),
        filter: default_filter,
        count: count,
        clearing: false
@@ -126,7 +127,7 @@ defmodule TodosWeb.TaskLive.Index do
     {:noreply, socket}
   end
 
-  def handle_event("create_task", params, socket) do
+  def handle_event("create_task", params, %{assigns: %{form: %{errors: []}}} = socket) do
     socket =
       case Tasks.create_task(params) do
         {:ok, _new_task} -> assign(socket, form: Tasks.change_task(%Task{}) |> to_form)
@@ -134,6 +135,11 @@ defmodule TodosWeb.TaskLive.Index do
       end
 
     {:noreply, socket}
+  end
+
+  def handle_event("create_task", _params, %{assigns: %{form: %{errors: errors}}} = socket) do
+    [title: {msg, _}] = errors
+    {:noreply, put_flash(socket, :error, msg)}
   end
 
   def handle_event("clear_completed", _, socket) do
@@ -188,17 +194,19 @@ defmodule TodosWeb.TaskLive.Index do
   def new_task_form(assigns) do
     ~H"""
     <.form
-      class="mt-6 bg-white dark:bg-[#25273D] px-6 py-5 rounded-md flex gap-6 drop-shadow-3xl z-10"
+      class="mt-4 sm:mt-6 bg-white dark:bg-[#25273D] px-5 py-4 sm:px-6 sm:py-5 rounded-md flex gap-3 sm:gap-6 drop-shadow-3xl z-10"
       phx-submit="create_task"
       phx-change="validate"
       phx-debounce="1000"
       for={@form}
     >
-      <div class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full border w-6 h-6" />
+      <div class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full border min-w-5 w-5 h-5 sm:w-6 sm:h-6" />
       <input
         name="title"
         placeholder="Create a new todo..."
-        class="text-lg outline-none placeholder-[#9495A5] dark:placeholder-[#767992] text-[#494C6B] dark:text-[#C8CBE7] w-full bg-transparent dark:caret-slate-50"
+        class={[
+          "text-sm sm:text-lg outline-none placeholder-[#9495A5] dark:placeholder-[#767992] text-[#494C6B] dark:text-[#C8CBE7] w-full bg-transparent caret-[#3A7CFD]"
+        ]}
       />
       <label for="title" class="hidden">Create a new todo</label>
     </.form>
@@ -208,13 +216,17 @@ defmodule TodosWeb.TaskLive.Index do
   def todo_item(assigns) do
     ~H"""
     <li
-      class="group px-6 py-5 flex justify-between border-b border-[#E3E4F1] dark:border-[#393A4B]"
+      class="group px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between border-b border-[#E3E4F1] dark:border-[#393A4B]"
       id={@id}
     >
-      <.form for={to_form(Tasks.change_task(@task))} class="flex gap-6" phx-value-id={@task.id}>
+      <.form
+        for={to_form(Tasks.change_task(@task))}
+        class="flex gap-3 sm:gap-6 items-center"
+        phx-value-id={@task.id}
+      >
         <label
           for={@task.id |> Integer.to_string()}
-          class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full peer border w-6 h-6 flex justify-center cursor-pointer items-center has-[:checked]:bg-gradient-to-br has-[:checked]:from-[#55DDFF] has-[:checked]:to-[#C058F3]"
+          class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full peer border w-5 sm:w-6 h-5 sm:h-6 flex justify-center cursor-pointer items-center has-[:checked]:bg-gradient-to-br has-[:checked]:from-[#55DDFF] has-[:checked]:to-[#C058F3]"
         >
           <input
             phx-change="toggle_status"
@@ -224,9 +236,12 @@ defmodule TodosWeb.TaskLive.Index do
             name="status"
             id={@task.id |> Integer.to_string()}
           />
-          <.icon name="hero-check-micro" class="bg-white hidden peer-checked:block" />
+          <.icon
+            name="hero-check-micro"
+            class="bg-white hidden peer-checked:block w-3 h-3 sm:w-4 sm:h-4"
+          />
         </label>
-        <span class="text-lg text-[#494C6B] dark:text-[#C8CBE7] peer-has-[:checked]:text-[#D1D2DA] dark:peer-has-[:checked]:text-[#4D5067] peer-has-[:checked]:line-through transition-all">
+        <span class="text-xs sm:text-lg text-[#494C6B] dark:text-[#C8CBE7] peer-has-[:checked]:text-[#D1D2DA] dark:peer-has-[:checked]:text-[#4D5067] peer-has-[:checked]:line-through transition-all">
           <%= @task.title %>
         </span>
       </.form>
@@ -234,12 +249,54 @@ defmodule TodosWeb.TaskLive.Index do
         phx-click="delete"
         phx-value-id={@task.id}
         data-confirm="Are you sure?"
-        class="hidden transition-all group-hover:block text-[#D1D2DA] dark:text-[#494C6B]  hover:text-white relative group/delete px-2 translate-x-2"
+        class="sm:hidden transition-all group-hover:block   hover:text-white group/delete px-2 translate-x-2 h-4"
       >
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-red-500 opacity-75  scale-0 group-hover/delete:scale-100 transition-all" />
-        <.icon name="hero-trash-solid" class="w-5" />
+        <svg
+          class="fill-[#494C6B] sm:w-4 sm:h-4"
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M11.7851 0.471404L11.3137 0L5.89256 5.42115L0.471404 0L0 0.471404L5.42115 5.89256L0 11.3137L0.471404 11.7851L5.89256 6.36396L11.3137 11.7851L11.7851 11.3137L6.36396 5.89256L11.7851 0.471404Z"
+          />
+        </svg>
+
+        <%!-- <.icon name="hero-x-mark-solid" class="w-4 h-4 sm:w-5 sm:h-5" /> --%>
       </button>
     </li>
+    """
+  end
+
+  def filters(assigns) do
+    ~H"""
+    <form phx-change="filter" class={["flex gap-4 font-bold", @class]}>
+      <%= for filter <- ["All", "Active", "Completed"] do %>
+        <span>
+          <input
+            type="radio"
+            name="filter"
+            value={filter}
+            id={filter}
+            checked={@filter == filter}
+            class="hidden peer"
+          />
+          <label
+            for={filter}
+            class={[
+              "cursor-pointer transition-all peer-checked:text-[#3A7CFD]",
+              @filter != filter && "hover:text-[#494C6B] dark:hover:text-[#E3E4F1]"
+            ]}
+          >
+            <%= filter %>
+          </label>
+        </span>
+      <% end %>
+    </form>
     """
   end
 end
