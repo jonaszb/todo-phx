@@ -42,11 +42,12 @@ defmodule TodosWeb.TaskLive.Index do
     ~H"""
     <button phx-click={JS.dispatch("toggle-darkmode")}>
       <.icon name="hero-moon-solid" class="bg-white dark:hidden" />
-      <.icon name="hero-sun-solid" , class="bg-white hidden dark:block" />
+      <.icon name="hero-sun-solid" class="bg-white hidden dark:block" />
     </button>
     """
   end
 
+  @impl true
   def handle_info({:task_created, task}, socket) do
     socket = update(socket, :count, &(&1 + 1))
 
@@ -199,10 +200,11 @@ defmodule TodosWeb.TaskLive.Index do
       phx-change="validate"
       phx-debounce="1000"
       for={@form}
+      id="task-form"
     >
       <div class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full border min-w-5 w-5 h-5 sm:w-6 sm:h-6" />
       <input
-        name="title"
+        name="task[title]"
         placeholder="Create a new todo..."
         class={[
           "text-sm sm:text-lg outline-none placeholder-[#9495A5] dark:placeholder-[#767992] text-[#494C6B] dark:text-[#C8CBE7] w-full bg-transparent caret-[#3A7CFD]"
@@ -248,7 +250,6 @@ defmodule TodosWeb.TaskLive.Index do
       <button
         phx-click="delete"
         phx-value-id={@task.id}
-        data-confirm="Are you sure?"
         class="sm:hidden transition-all group-hover:block   hover:text-white group/delete px-2 translate-x-2 h-4"
       >
         <svg
