@@ -38,15 +38,6 @@ defmodule TodosWeb.TaskLive.Index do
     end
   end
 
-  def dark_mode_toggle(assigns) do
-    ~H"""
-    <button phx-click={JS.dispatch("toggle-darkmode")}>
-      <.icon name="hero-moon-solid" class="bg-white dark:hidden" />
-      <.icon name="hero-sun-solid" class="bg-white hidden dark:block" />
-    </button>
-    """
-  end
-
   @impl true
   def handle_info({:task_created, task}, socket) do
     socket = update(socket, :count, &(&1 + 1))
@@ -107,8 +98,8 @@ defmodule TodosWeb.TaskLive.Index do
   end
 
   @impl true
-  def handle_event("validate", task_params, socket) do
-    changeset = %Task{} |> Tasks.change_task(task_params) |> Map.put(:action, :validate)
+  def handle_event("validate", %{"task" => task}, socket) do
+    changeset = %Task{} |> Tasks.change_task(task) |> Map.put(:action, :validate)
     {:noreply, assign(socket, form: to_form(changeset))}
   end
 
@@ -128,9 +119,9 @@ defmodule TodosWeb.TaskLive.Index do
     {:noreply, socket}
   end
 
-  def handle_event("create_task", params, %{assigns: %{form: %{errors: []}}} = socket) do
+  def handle_event("create_task", %{"task" => task}, %{assigns: %{form: %{errors: []}}} = socket) do
     socket =
-      case Tasks.create_task(params) do
+      case Tasks.create_task(task) do
         {:ok, _new_task} -> assign(socket, form: Tasks.change_task(%Task{}) |> to_form)
         {:error, error_msg} -> put_flash(socket, :error, error_msg)
       end
@@ -192,6 +183,15 @@ defmodule TodosWeb.TaskLive.Index do
     end
   end
 
+  def dark_mode_toggle(assigns) do
+    ~H"""
+    <button phx-click={JS.dispatch("toggle-darkmode")} aria-label="Theme toggle">
+      <.icon name="hero-moon-solid" class="bg-white dark:hidden" />
+      <.icon name="hero-sun-solid" class="bg-white hidden dark:block" />
+    </button>
+    """
+  end
+
   def new_task_form(assigns) do
     ~H"""
     <.form
@@ -203,14 +203,13 @@ defmodule TodosWeb.TaskLive.Index do
       id="task-form"
     >
       <div class="border-[#E3E4F1] dark:border-[#393A4B] rounded-full border min-w-5 w-5 h-5 sm:w-6 sm:h-6" />
-      <input
-        name="task[title]"
+      <.input
+        field={@form[:title]}
         placeholder="Create a new todo..."
         class={[
-          "text-sm sm:text-lg outline-none placeholder-[#9495A5] dark:placeholder-[#767992] text-[#494C6B] dark:text-[#C8CBE7] w-full bg-transparent caret-[#3A7CFD]"
+          "text-sm sm:text-lg border-none outline-none placeholder-[#9495A5] dark:placeholder-[#767992] text-[#494C6B] dark:text-[#C8CBE7] w-full bg-transparent caret-[#3A7CFD]"
         ]}
       />
-      <label for="title" class="hidden">Create a new todo</label>
     </.form>
     """
   end
@@ -250,6 +249,7 @@ defmodule TodosWeb.TaskLive.Index do
       <button
         phx-click="delete"
         phx-value-id={@task.id}
+        id={"delete-task-#{@task.id}"}
         class="sm:hidden transition-all group-hover:block   hover:text-white group/delete px-2 translate-x-2 h-4"
       >
         <svg
@@ -282,12 +282,12 @@ defmodule TodosWeb.TaskLive.Index do
             type="radio"
             name="filter"
             value={filter}
-            id={filter}
+            id={"#{@type}-#{filter}"}
             checked={@filter == filter}
             class="hidden peer"
           />
           <label
-            for={filter}
+            for={"#{@type}-#{filter}"}
             class={[
               "cursor-pointer transition-all peer-checked:text-[#3A7CFD]",
               @filter != filter && "hover:text-[#494C6B] dark:hover:text-[#E3E4F1]"

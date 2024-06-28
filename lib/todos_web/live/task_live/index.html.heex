@@ -17,7 +17,7 @@
         </ul>
         <footer class="flex py-4 px-6 text-[#9495A5] dark:text-[#5B5E7E] text-sm justify-between">
           <span><%= "#{@count} items left" %></span>
-          <.filters filter={@filter} class="hidden sm:flex" />
+          <.filters type="desktop" filter={@filter} class="hidden sm:flex" />
           <button
             disabled={@clearing}
             phx-click="clear_completed"
@@ -29,6 +29,7 @@
       </div>
 
       <.filters
+        type="mobile"
         filter={@filter}
         class="sm:hidden w-full py-4 justify-center bg-white dark:bg-[#25273D] drop-shadow-2xl rounded-md z-20 text-[#9495A5] dark:text-[#5B5E7E] text-sm "
       />
